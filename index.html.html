@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1d1f24">
+<title>에이스 체스</title>
+<style>
+:root{
+  --bg:#1d1f24; --panel:#2a2d34; --panel2:#33373f; --text:#eceff4; --sub:#9aa3b2;
+  --light:#eed9b5; --dark:#b58863; --green:#3ecf6a; --gold:#f5c542; --gray:#7d8590; --red:#e5484d;
+  --cell:44px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+  overscroll-behavior:none;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+#app{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:8px;gap:8px}
+.panel{width:var(--bw);display:flex;align-items:center;justify-content:space-between;background:var(--panel);
+  border-radius:12px;padding:8px 12px;border:2px solid transparent;transition:border-color .2s}
+.panel.turn{border-color:#5b8def}
+.pinfo{display:flex;flex-direction:column;gap:2px}
+.pname{font-weight:700;font-size:16px}
+.hp{font-size:14px;color:var(--red);letter-spacing:1px}
+.hp small{color:var(--sub);font-size:11px;letter-spacing:0;margin-right:4px}
+.pstack{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:96px}
+.pts{font-size:22px;font-weight:800;line-height:1}
+.pts span{font-size:12px;color:var(--sub);font-weight:600;margin-left:2px}
+.upbtn{border:none;border-radius:8px;padding:6px 14px;font-size:14px;font-weight:700;background:var(--panel2);color:var(--text)}
+.upbtn.on{background:var(--gold);color:#222}
+.upbtn:disabled{opacity:.35}
+#status{font-size:13px;color:var(--sub);min-height:18px;text-align:center}
+#status b{color:var(--text)}
+#status .chk{color:var(--red);font-weight:800}
+#wrap{position:relative;width:var(--bw);height:var(--bw)}
+#board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;height:100%;
+  border-radius:6px;overflow:hidden;box-shadow:0 4px 18px #0008;outline:3px solid transparent;transition:outline-color .2s}
+#board.upmode{outline-color:var(--gold)}
+.sq{position:relative;display:flex;align-items:center;justify-content:center}
+.sq.l{background:var(--light)} .sq.d{background:var(--dark)}
+.sq.last::before{content:"";position:absolute;inset:0;background:#f7ec5a55}
+.sq.sel::before{content:"";position:absolute;inset:0;background:#7fc24a88}
+.sq.usel::before{content:"";position:absolute;inset:0;background:#f5c54288}
+.sq.chk::before{content:"";position:absolute;inset:0;background:radial-gradient(circle,#ff2a2acc 0%,#ff2a2a55 45%,transparent 75%)}
+.coord{position:absolute;font-size:calc(var(--cell)*.2);font-weight:700;opacity:.75;pointer-events:none}
+.coord.f{right:2px;bottom:1px} .coord.r{left:2px;top:1px}
+.sq.l .coord{color:var(--dark)} .sq.d .coord{color:var(--light)}
+.pc{position:relative;z-index:2;font-size:calc(var(--cell)*.8);line-height:1;
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Apple Symbols","DejaVu Sans",serif;pointer-events:none}
+.pc.w{color:#fbfbfb;text-shadow:0 0 1px #000,0 0 1px #000,0 0 2px #000,1px 1px 1px #0008}
+.pc.b{color:#1a1a1a;text-shadow:0 0 1px #fff9,0 0 2px #fff6}
+.amz{position:absolute;z-index:3;right:6%;bottom:4%;font-size:calc(var(--cell)*.36);pointer-events:none;
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Apple Symbols","DejaVu Sans",serif}
+.amz.w{color:#fff;text-shadow:0 0 1px #000,0 0 2px #000} .amz.b{color:#111;text-shadow:0 0 2px #fff}
+.lv{position:absolute;z-index:3;top:1px;right:2px;font-size:calc(var(--cell)*.2);color:#3b82f6;
+  text-shadow:0 0 2px #fff;pointer-events:none;letter-spacing:-1px}
+.lv.max{color:#d99a00}
+.dot{position:absolute;z-index:4;width:30%;height:30%;border-radius:50%;background:#2229;pointer-events:none}
+.ring{position:absolute;z-index:4;inset:6%;border-radius:50%;border:calc(var(--cell)*.08) solid #2229;pointer-events:none}
+.dot.x,.ring.x{background:none;border:calc(var(--cell)*.08) solid #e5484dcc;border-radius:50%;inset:6%;width:auto;height:auto}
+.dot.x{inset:22%}
+.hitmark{position:absolute;z-index:4;inset:8%;border-radius:50%;border:calc(var(--cell)*.08) dashed var(--red);pointer-events:none}
+.sq.up-ok .pc{animation:pulse 1.4s infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+#ubox{position:absolute;z-index:10;display:none;background:#20232acc;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  border:3px solid var(--gray);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4;color:var(--text);
+  box-shadow:0 6px 18px #000a;pointer-events:none}
+#ubox.green{border-color:var(--green)} #ubox.gold{border-color:var(--gold)} #ubox.gray{border-color:var(--gray)}
+#ubox .t{font-weight:800;font-size:14px;margin-bottom:2px}
+#ubox .c{color:var(--sub);margin-bottom:4px}
+#ubox .c b{color:var(--text)}
+#ubox .h{margin-top:5px;font-weight:700;font-size:12px}
+#ubox.green .h{color:var(--green)} #ubox.gold .h{color:var(--gold)} #ubox.gray .h{color:var(--gray)}
+.bar{width:var(--bw);display:flex;gap:8px}
+.bar button:disabled{opacity:.35}
+.bar button{flex:1;border:none;border-radius:10px;padding:10px 2px;background:var(--panel);color:var(--text);font-size:13px;font-weight:600;white-space:nowrap}
+#toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;background:#000c;color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;text-align:center;opacity:0;transition:opacity .25s;
+  pointer-events:none;max-width:85vw;line-height:1.5}
+#toast.show{opacity:1}
+.modal{position:fixed;inset:0;z-index:40;background:#000a;display:none;align-items:center;justify-content:center;padding:16px}
+.modal.show{display:flex}
+.card{background:var(--panel);border-radius:14px;padding:16px;max-width:520px;width:100%;max-height:86vh;overflow:auto}
+.card h2{margin:0 0 10px;font-size:18px}
+.card h3{margin:14px 0 6px;font-size:15px;color:var(--gold)}
+.card p,.card li{font-size:13px;line-height:1.6;color:#d6dbe4}
+.card ul{padding-left:18px;margin:4px 0}
+.card table{width:100%;border-collapse:collapse;font-size:12.5px}
+.card td{border-top:1px solid #444;padding:5px 4px;vertical-align:top}
+.card td:first-child{white-space:nowrap;color:var(--sub)}
+.card .close{margin-top:12px;width:100%;border:none;border-radius:10px;padding:10px;background:#5b8def;color:#fff;font-weight:700;font-size:14px}
+.promo{display:flex;gap:8px;justify-content:center}
+.promo button{width:64px;height:64px;border-radius:10px;border:none;background:var(--light);font-size:44px;line-height:1;
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Apple Symbols","DejaVu Sans",serif}
+.over-btns{display:flex;gap:8px}
+.over-btns button{flex:1}
+/* ===== 턴 회전: 판은 고정, 기물 방향과 글자만 180° ===== */
+.pcw{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+/* 회전 대신 위아래로 뒤집히는 카드 플립: scaleY가 0이 되는 순간 좌우를 바꿔 180° 상태로 착지 */
+body.flip .pcw, body.flip .coord, body.flip .rot, body.flip #ubox{transform:scale(-1,-1)}
+body.flip #toast{transform:translate(-50%,-50%) scale(-1,-1)}
+@keyframes fToB{0%{transform:scale(1,1);animation-timing-function:ease-in}50%{transform:scale(1,0)}
+  50.01%{transform:scale(-1,0);animation-timing-function:ease-out}100%{transform:scale(-1,-1)}}
+@keyframes fToW{0%{transform:scale(-1,-1);animation-timing-function:ease-in}50%{transform:scale(-1,0)}
+  50.01%{transform:scale(1,0);animation-timing-function:ease-out}100%{transform:scale(1,1)}}
+body.flipping.flip .pcw, body.flipping.flip .coord, body.flipping.flip .rot, body.flipping.flip #ubox{animation:fToB .42s}
+body.flipping:not(.flip) .pcw, body.flipping:not(.flip) .coord, body.flipping:not(.flip) .rot, body.flipping:not(.flip) #ubox{animation:fToW .42s}
+.clk{font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;background:#1d1f24;border-radius:6px;padding:1px 7px;align-self:flex-start;color:var(--sub)}
+.panel.turn .clk{color:var(--text);background:#3a4b6e}
+.clk.low{color:#fff !important;background:var(--red) !important}
+.tcs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0 4px}
+.tcs button{border:2px solid #444;background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600}
+.tcs button.on{border-color:#5b8def;background:#2f3f63}
+#logList{list-style:none;padding:0;margin:0;font-size:13px;max-height:58vh;overflow:auto}
+#logList li{padding:5px 2px;border-top:1px solid #3a3d45;display:flex;gap:8px;align-items:baseline;line-height:1.45}
+#logList .n{color:var(--sub);font-size:11px;min-width:30px;font-variant-numeric:tabular-nums}
+#logList .sd{font-weight:800;min-width:18px}
+#logList .sd.w{color:#fff} #logList .sd.b{color:#9aa3b2}
+#logList .ev{color:var(--sub);font-size:11.5px;display:block}
+#logList li.up .tx{color:var(--gold)}
+#logList li.sys{justify-content:center;color:var(--sub);font-size:12px}
+#logList li.end{justify-content:center;color:var(--red);font-weight:700}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="panel rot" id="pb"></div>
+  <div id="status" class="rot"></div>
+  <div id="wrap"><div id="board"></div><div id="ubox"></div></div>
+  <div class="panel rot" id="pw"></div>
+  <div class="bar rot"><button id="helpBtn">규칙</button><button id="logBtn">기록</button><button id="flipBtn"></button><button id="resignBtn">기권</button><button id="newBtn">새 게임</button></div>
+</div>
+<div id="toast"></div>
+
+<div class="modal" id="promoM"><div class="card rot"><h2 style="text-align:center">승격할 기물 선택</h2><div class="promo" id="promoBox"></div></div></div>
+<div class="modal" id="overM"><div class="card rot" style="text-align:center"><h2 id="overT"></h2><p id="overD"></p>
+  <div class="over-btns"><button class="close" id="overView" style="background:#444">판 보기</button><button class="close" id="overLog" style="background:#444">기록</button><button class="close" id="overNew">새 게임</button></div></div></div>
+<div class="modal" id="resM"><div class="card rot" style="text-align:center"><h2 id="resT"></h2><p>기권하면 상대가 승리합니다.</p>
+  <div class="over-btns"><button class="close" id="resNo" style="background:#444">취소</button><button class="close" id="resYes" style="background:var(--red)">기권</button></div></div></div>
+<div class="modal" id="logM"><div class="card rot"><h2>게임 기록</h2><ul id="logList"></ul>
+  <div class="over-btns"><button class="close" id="logCopy" style="background:#444">텍스트 복사</button><button class="close" id="logClose">닫기</button></div></div></div>
+<div class="modal" id="helpM"><div class="card rot" id="helpC"></div></div>
+<div class="modal" id="confM"><div class="card rot" style="text-align:center"><h2>새 게임</h2><p style="margin:0">시간 제한 (각자 보유 시간 + 수당 추가 시간)</p><div class="tcs" id="tcBox"></div><p id="confNote" style="font-size:12px;color:var(--sub)">현재 게임은 사라집니다.</p>
+  <div class="over-btns"><button class="close" id="confNo" style="background:#444">취소</button><button class="close" id="confYes">시작</button></div></div></div>
+
+<script>
+"use strict";
+/* ===================== 데이터 ===================== */
+const VS = "\uFE0E"; // 이모지 대신 텍스트 글리프로 표시
+const GLYPH = {K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"};
+const VAL = {P:1,N:3,B:3,R:5,Q:9,A:12,K:0};
+const NAME = {P:"폰",N:"나이트",B:"비숍",R:"룩",Q:"퀸",A:"아마존",K:"킹"};
+const SIDE = {w:"백",b:"흑"};
+const UPG = {
+  P:[{cost:1,desc:"두 번째 이동에서도 2칸 전진 가능 (첫 이동을 1칸만 했어도 가능)"},
+     {cost:3,desc:"전진하면서 기물을 잡을 수 있음 (2칸 전진에도 적용)"}],
+  B:[{cost:4,desc:"아군 기물 1개를 뛰어넘어 이동 가능 (넘은 뒤 잡기 가능)"},
+     {cost:5,desc:"적 기물 1개를 뛰어넘어 이동 가능 (넘은 뒤 잡기 가능)"},
+     {cost:7,desc:"아무 기물 1개를 추가로 뛰어넘기 가능 → 최대 3개 + 메이저 피스로 승급 (점수 5)"}],
+  R:[{cost:4,desc:"아군 기물 1개를 뛰어넘어 이동 가능 (넘은 뒤 잡기 가능)"},
+     {cost:5,desc:"적 기물 1개를 뛰어넘어 이동 가능 (넘은 뒤 잡기 가능)"},
+     {cost:7,desc:"이전 능력 삭제 → 아무 기물이나 2개 뛰어넘기 가능 (잡기 가능)"}],
+  N:[{cost:4,desc:"뛰어넘은 적 기물을 잡음 (가장 먼저 넘은 1개)"},
+     {cost:6,desc:"L자 진로(앞 2칸 + 옆 1칸) 위의 어느 칸이든 멈출 수 있음"},
+     {cost:9,desc:"진로 끝까지 이동하면 진로상의 모든 적 기물을 잡음"}],
+  K:[{cost:5,desc:"아군 기물이 잡히면 폰 1 · 마이너 3 · 메이저 4 포인트 획득"},
+     {cost:6,desc:"아군 기물이 잡히면 그 기물 점수의 절반(내림)을 추가로 획득"},
+     {cost:13,desc:"최대 체력 3 — 체력이 2 이상이면 체크메이트 대신 공격받아 체력이 1 깎임"}],
+  Q:[{cost:15,desc:"아마존으로 변신 (퀸 + 나이트 이동, 점수 12)"}],
+  A:[]
+};
+
+/* ===================== 엔진 ===================== */
+const other = c => c==="w"?"b":"w";
+const inB = (r,c) => r>=0&&r<8&&c>=0&&c<8;
+const SQ = (r,c) => r*8+c;
+const clone = o => JSON.parse(JSON.stringify(o));
+const value = p => (p.t==="B"&&p.lv>=3) ? 5 : VAL[p.t];
+const category = p => p.t==="P" ? "pawn" : (p.t==="N"||(p.t==="B"&&p.lv<3)) ? "minor" : "major";
+const maxed = p => p.lv >= (UPG[p.t]||[]).length;
+
+function newState(){
+  const B = Array(64).fill(null), back = "RNBQKBNR";
+  const mk = (t,c) => ({t,c,lv:0,moved:false,moves:0});
+  for(let i=0;i<8;i++){
+    B[i]=mk(back[i],"b"); B[8+i]=mk("P","b");
+    B[48+i]=mk("P","w"); B[56+i]=mk(back[i],"w");
+  }
+  return {board:B,turn:"w",pts:{w:0,b:0},hp:{w:1,b:1},maxHp:{w:1,b:1},ep:-1,cycle:0,last:null,over:null,events:[]};
+}
+
+function jumpBudget(p){
+  if(p.t!=="B"&&p.t!=="R") return {f:0,e:0,a:0};
+  if(p.lv===0) return {f:0,e:0,a:0};
+  if(p.lv===1) return {f:1,e:0,a:0};
+  if(p.lv===2) return {f:1,e:1,a:0};
+  return p.t==="B" ? {f:1,e:1,a:1} : {f:0,e:0,a:2};
+}
+
+// 의사 이동 생성 (자기 킹 안전 여부는 미검사). 적 킹 칸에 도달하는 이동은 hit=true.
+function pseudo(S, from){
+  const B=S.board, p=B[from]; if(!p) return [];
+  const r=from>>3, c=from&7, out=[];
+  const mk = (to, extra={}) => {
+    const q=B[to], m={from,to,captures:[],hit:false,...extra};
+    if(q && q.c!==p.c){ if(q.t==="K") m.hit=true; else m.captures.push(to); }
+    return m;
+  };
+  const slide = (dirs, bud) => {
+    for(const [dr,dc] of dirs){
+      let F=bud.f,E=bud.e,A=bud.a, rr=r+dr, cc=c+dc;
+      while(inB(rr,cc)){
+        const s=SQ(rr,cc), q=B[s];
+        if(!q){ out.push(mk(s)); }
+        else{
+          if(q.c!==p.c) out.push(mk(s));
+          if(q.c===p.c){ if(F>0)F--; else if(A>0)A--; else break; }
+          else         { if(E>0)E--; else if(A>0)A--; else break; }
+        }
+        rr+=dr; cc+=dc;
+      }
+    }
+  };
+  const knight = lv => {
+    const seen=new Set();
+    for(const [lr,lc] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const perps = lr ? [[0,1],[0,-1]] : [[1,0],[-1,0]];
+      for(const [pr,pc] of perps){
+        const path=[[r+lr,c+lc],[r+2*lr,c+2*lc],[r+2*lr+pr,c+2*lc+pc]];
+        const lands = lv>=2 ? [0,1,2] : [2];
+        for(const i of lands){
+          const [tr,tc]=path[i]; if(!inB(tr,tc)) continue;
+          const to=SQ(tr,tc), q=B[to];
+          if(q && q.c===p.c) continue;
+          if(seen.has(to)) continue; seen.add(to);
+          const m=mk(to);
+          if(!m.hit && lv>=1){
+            const jumped=path.slice(0,i).map(([a,b])=>SQ(a,b));
+            const foes=jumped.filter(s=>B[s]&&B[s].c!==p.c&&B[s].t!=="K");
+            if(lv>=3 && i===2) m.captures.push(...foes);
+            else if(foes.length) m.captures.push(foes[0]);
+            if(m.captures.length>(q&&!m.hit?1:0)) m.multi=true;
+          }
+          out.push(m);
+        }
+      }
+    }
+  };
+  const ROOK=[[1,0],[-1,0],[0,1],[0,-1]], BISH=[[1,1],[1,-1],[-1,1],[-1,-1]];
+  switch(p.t){
+    case "P":{
+      const d = p.c==="w"?-1:1, last = p.c==="w"?0:7;
+      const r1=r+d;
+      if(inB(r1,c)){
+        const s1=SQ(r1,c), q1=B[s1];
+        if(!q1) out.push(mk(s1,{promo:r1===last}));
+        else if(q1.c!==p.c && p.lv>=2) out.push(mk(s1,{promo:r1===last}));
+        const canTwo = p.moves===0 || (p.lv>=1 && p.moves===1);
+        const r2=r+2*d;
+        if(!q1 && canTwo && inB(r2,c)){
+          const s2=SQ(r2,c), q2=B[s2];
+          if(!q2) out.push(mk(s2,{double:true,promo:r2===last}));
+          else if(q2.c!==p.c && p.lv>=2) out.push(mk(s2,{double:true,promo:r2===last}));
+        }
+        for(const dc of [-1,1]){
+          if(!inB(r1,c+dc)) continue;
+          const s=SQ(r1,c+dc), q=B[s];
+          if(q && q.c!==p.c) out.push(mk(s,{promo:r1===last}));
+          else if(!q && s===S.ep){
+            const cap=SQ(r,c+dc);
+            if(B[cap]&&B[cap].t==="P"&&B[cap].c!==p.c) out.push({from,to:s,captures:[cap],hit:false,ep:true});
+          }
+        }
+      }
+      break;
+    }
+    case "N": knight(p.lv); break;
+    case "B": slide(BISH, jumpBudget(p)); break;
+    case "R": slide(ROOK, jumpBudget(p)); break;
+    case "Q": slide([...ROOK,...BISH], {f:0,e:0,a:0}); break;
+    case "A": slide([...ROOK,...BISH], {f:0,e:0,a:0}); knight(0); break;
+    case "K":
+      for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+        if(!dr&&!dc) continue; const rr=r+dr,cc=c+dc; if(!inB(rr,cc)) continue;
+        const q=B[SQ(rr,cc)]; if(q&&q.c===p.c) continue; out.push(mk(SQ(rr,cc)));
+      }
+      break;
+  }
+  return out;
+}
+
+function kingSq(S,color){ return S.board.findIndex(p=>p&&p.t==="K"&&p.c===color); }
+function attacked(S, sq, by){
+  for(let i=0;i<64;i++){
+    const p=S.board[i]; if(!p||p.c!==by) continue;
+    if(pseudo(S,i).some(m=>m.to===sq)) return true;
+  }
+  return false;
+}
+function inCheck(S,color){ const k=kingSq(S,color); return k>=0 && attacked(S,k,other(color)); }
+
+function castles(S, from){
+  const B=S.board, p=B[from], out=[];
+  if(p.moved) return out;
+  const r=from>>3, op=other(p.c), strict = S.hp[p.c]===1;
+  if(strict && inCheck(S,p.c)) return out;
+  const opts=[{rc:7,empty:[5,6],pass:5,kc:6,rt:5,side:"K"},{rc:0,empty:[1,2,3],pass:3,kc:2,rt:3,side:"Q"}];
+  for(const o of opts){
+    const rk=B[SQ(r,o.rc)];
+    if(!rk||rk.t!=="R"||rk.c!==p.c||rk.moved) continue;
+    if(o.empty.some(c=>B[SQ(r,c)])) continue;
+    if(strict){
+      const T=clone(S); T.board[SQ(r,o.pass)]=T.board[from]; T.board[from]=null;
+      if(attacked(T,SQ(r,o.pass),op)) continue;
+    }
+    out.push({from,to:SQ(r,o.kc),captures:[],hit:false,castle:o.side,rookFrom:SQ(r,o.rc),rookTo:SQ(r,o.rt)});
+  }
+  return out;
+}
+
+function legalMoves(S, from){
+  const p=S.board[from]; if(!p) return [];
+  const op=other(p.c);
+  let ms=pseudo(S,from).filter(m=>!m.hit || S.hp[op]>1);
+  if(p.t==="K") ms=ms.concat(castles(S,from));
+  if(S.hp[p.c]===1) ms=ms.filter(m=>!inCheck(applyMove(S,m,"Q",true),p.c));
+  return ms;
+}
+function hasLegal(S,color){
+  for(let i=0;i<64;i++){ const p=S.board[i]; if(p&&p.c===color&&legalMoves(S,i).length) return true; }
+  return false;
+}
+
+function kingBonus(S, owner, lost){
+  const k=S.board.find(p=>p&&p.t==="K"&&p.c===owner); if(!k||k.lv<1) return 0;
+  const cat=category(lost);
+  let b = cat==="pawn"?1:cat==="minor"?3:4;
+  if(k.lv>=2) b += Math.floor(value(lost)/2);
+  return b;
+}
+
+function applyMove(S, m, promoTo="Q", sim=false){
+  const N=clone(S), B=N.board, p=B[m.from], me=p.c, op=other(me);
+  N.events=[];
+  if(m.hit){
+    N.hp[op]--; N.ep=-1;
+    if(!sim) N.events.push(`${SIDE[op]} 킹 공격! 체력 ${N.hp[op]}/${N.maxHp[op]}`);
+  }else{
+    let gain=0, bonus=0;
+    for(const s of m.captures){
+      const q=B[s]; if(!q) continue;
+      gain+=value(q); bonus+=kingBonus(N,op,q); B[s]=null;
+    }
+    B[m.to]=p; B[m.from]=null; p.moved=true; p.moves++;
+    if(m.castle){ const rk=B[m.rookFrom]; B[m.rookTo]=rk; B[m.rookFrom]=null; rk.moved=true; }
+    if(m.promo){ p.t=promoTo; p.lv=0; }
+    N.ep = (m.double && !m.captures.length) ? ((m.from+m.to)>>1) : -1;
+    N.pts[me]+=gain; N.pts[op]+=bonus;
+    if(!sim){
+      if(gain) N.events.push(`${SIDE[me]} ${m.captures.length>1?m.captures.length+"개 ":""}잡기 +${gain}P`);
+      if(bonus) N.events.push(`${SIDE[op]} 킹 능력 +${bonus}P`);
+    }
+  }
+  N.last={from:m.from,to:m.hit?m.from:m.to,hitTo:m.hit?m.to:-1};
+  N.turn=op;
+  if(op==="w"){ N.cycle++; N.pts.w++; N.pts.b++; if(!sim) N.events.push(`사이클 ${N.cycle} 완료 · 양측 +1P`); }
+  return N;
+}
+
+function checkEnd(S){
+  const side=S.turn;
+  if(!hasLegal(S,side)){
+    if(S.hp[side]===1 && inCheck(S,side)) S.over={winner:other(side),reason:"체크메이트"};
+    else S.over={winner:null,reason:"스테일메이트"};
+    return;
+  }
+  const rest=S.board.filter(p=>p&&p.t!=="K");
+  if(rest.length===0) S.over={winner:null,reason:"킹만 남음"};
+}
+
+/* ===================== UI ===================== */
+let autoFlip=true;
+try{ autoFlip = localStorage.getItem("aceFlip")!=="0"; }catch(e){}
+const TCS=[{l:"무제한",b:0,i:0},{l:"1분",b:60,i:0},{l:"3분 +2초",b:180,i:2},{l:"5분",b:300,i:0},{l:"10분",b:600,i:0},{l:"15분 +10초",b:900,i:10}];
+let tcIdx=0; try{ const v=+localStorage.getItem("aceTC"); if(v>=0&&v<TCS.length) tcIdx=v; }catch(e){}
+let tc=TCS[tcIdx], clk={w:tc.b*1000,b:tc.b*1000}, turnStart=performance.now();
+let gameLog=[], prevFlip=false, flipT=0;
+let S=newState(), sel=-1, selMoves=[], upMode=false, upSel=-1, pendingMove=null, toastT=0;
+const $=id=>document.getElementById(id);
+const boardEl=$("board"), ubox=$("ubox");
+
+function layout(){
+  const bw=Math.floor(Math.min(window.innerWidth-16, window.innerHeight-250, 560));
+  const size=Math.max(240,bw-bw%8);
+  document.documentElement.style.setProperty("--bw",size+"px");
+  document.documentElement.style.setProperty("--cell",(size/8)+"px");
+  renderBox();
+}
+
+function pieceHTML(p){
+  const g=GLYPH[p.t==="A"?"Q":p.t]+VS;
+  let h=`<div class="pcw"><span class="pc ${p.c}">${g}</span>`;
+  if(p.t==="A") h+=`<span class="amz ${p.c}">${GLYPH.N+VS}</span>`;
+  else if(p.lv>0) h+=`<span class="lv ${maxed(p)?"max":""}">${"★".repeat(p.lv)}</span>`;
+  return h+"</div>";
+}
+
+function renderPanel(color){
+  const el=$(color==="w"?"pw":"pb"), my=S.turn===color&&!S.over;
+  el.classList.toggle("turn",my);
+  const hearts="♥".repeat(S.hp[color])+"♡".repeat(S.maxHp[color]-S.hp[color]);
+  el.innerHTML=`<div class="pinfo"><div class="pname">${color==="w"?"♔ 백":"♚ 흑"}${my?" · 차례":""}</div>
+    <div class="hp"><small>킹 체력</small>${hearts}</div>${tc.b?`<div class="clk" id="clk-${color}"></div>`:""}</div>
+    <div class="pstack"><div class="pts">${S.pts[color]}<span>P</span></div>
+    <button class="upbtn ${my&&upMode?"on":""}" data-c="${color}" ${my?"":"disabled"}>${my&&upMode?"강화 종료":"강화"}</button></div>`;
+  el.querySelector(".upbtn").onclick=()=>{
+    if(S.turn!==color||S.over) return;
+    upMode=!upMode; upSel=-1; sel=-1; selMoves=[]; render();
+  };
+}
+
+function render(){
+  const fl = autoFlip && S.turn==="b";
+  if(fl!==prevFlip){
+    document.body.classList.add("flipping"); clearTimeout(flipT);
+    flipT=setTimeout(()=>document.body.classList.remove("flipping"),450);
+    prevFlip=fl;
+  }
+  document.body.classList.toggle("flip", fl);
+  $("resignBtn").disabled = !!S.over;
+  $("flipBtn").textContent = `회전 ${autoFlip?"ON":"OFF"}`;
+  renderPanel("w"); renderPanel("b"); drawClocks();
+  const checkSq = S.hp[S.turn]===1 && inCheck(S,S.turn) ? kingSq(S,S.turn) : -1;
+  let st=`완료 사이클 <b>${S.cycle}</b> · <b>${SIDE[S.turn]}</b> 차례`;
+  if(S.over) st=`게임 종료 — ${S.over.reason}`;
+  else if(checkSq>=0) st+=` · <span class="chk">체크!</span>`;
+  else if(S.hp[S.turn]>1 && inCheck(S,S.turn)) st+=` · <span class="chk">킹 위협</span>`;
+  if(upMode) st=`<b style="color:var(--gold)">강화 모드</b> · 강화할 기물을 누르세요`;
+  $("status").innerHTML=st;
+  boardEl.classList.toggle("upmode",upMode);
+
+  const targets=new Map(); selMoves.forEach(m=>targets.set(m.to,m));
+  let h="";
+  for(let i=0;i<64;i++){
+    const r=i>>3,c=i&7,p=S.board[i];
+    const cls=["sq",(r+c)%2?"d":"l"];
+    if(S.last&&(S.last.from===i||S.last.to===i||S.last.hitTo===i)) cls.push("last");
+    if(i===sel) cls.push("sel");
+    if(upMode&&i===upSel) cls.push("usel");
+    if(i===checkSq) cls.push("chk");
+    if(upMode&&p&&p.c===S.turn&&!maxed(p)&&S.pts[p.c]>=UPG[p.t][p.lv].cost) cls.push("up-ok");
+    let inner="";
+    if(c===7) inner+=`<span class="coord r" style="left:auto;right:2px">${8-r}</span>`;
+    if(r===7) inner+=`<span class="coord f" style="right:auto;left:2px">${"abcdefgh"[c]}</span>`;
+    if(p) inner+=pieceHTML(p);
+    const m=targets.get(i);
+    if(m){
+      if(m.hit) inner+=`<span class="hitmark"></span>`;
+      else if(m.captures.length) inner+=`<span class="ring ${m.multi||m.ep?"x":""}"></span>`;
+      else inner+=`<span class="dot"></span>`;
+    }
+    // 다중 잡기 대상 표시
+    h+=`<div class="${cls.join(" ")}" data-s="${i}">${inner}</div>`;
+  }
+  boardEl.innerHTML=h;
+  renderBox();
+}
+
+function renderBox(){
+  if(!upMode||upSel<0||!S.board[upSel]){ ubox.style.display="none"; return; }
+  const p=S.board[upSel], ups=UPG[p.t]||[];
+  let cls,html;
+  if(maxed(p)){
+    cls="gray";
+    html=`<div class="t">${NAME[p.t]} — 최종 강화 완료</div><div class="c">더 이상 강화할 수 없습니다.</div>`;
+  }else{
+    const u=ups[p.lv], fin=p.lv===ups.length-1, ok=S.pts[p.c]>=u.cost;
+    cls= ok ? (fin?"gold":"green") : "gray";
+    const lvTxt = p.t==="Q" ? "변신" : `${p.lv+1}강`;
+    html=`<div class="t">${NAME[p.t]} ${lvTxt}${fin&&p.t!=="Q"?" (최종)":""}</div>
+      <div class="c">필요 <b>${u.cost}P</b> · 보유 ${S.pts[p.c]}P</div>
+      <div>${u.desc}</div>
+      <div class="h">${ok?"한 번 더 누르면 강화":"포인트 부족"}</div>`;
+  }
+  ubox.className=cls; ubox.innerHTML=html; ubox.style.display="block";
+  const bw=boardEl.clientWidth, cell=bw/8, r=upSel>>3, c=upSel&7;
+  const w=Math.min(cell*4-8, 240); ubox.style.width=w+"px";
+  const left = c<=3 ? (c+1)*cell+4 : c*cell-w-4;
+  ubox.style.left=left+"px";
+  const bh=ubox.offsetHeight;
+  let top=r*cell+cell/2-bh/2; top=Math.max(2,Math.min(bw-bh-2,top));
+  ubox.style.top=top+"px";
+}
+
+function toast(msgs){
+  if(!msgs||!msgs.length) return;
+  const t=$("toast"); t.innerHTML=msgs.join("<br>"); t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1500);
+}
+
+function tryUpgrade(s){
+  const p=S.board[s]; if(maxed(p)) return;
+  const u=UPG[p.t][p.lv];
+  if(S.pts[p.c]<u.cost){ toast([`포인트 부족 (${u.cost-S.pts[p.c]}P 더 필요)`]); return; }
+  S.pts[p.c]-=u.cost;
+  const at=sqName(s);
+  if(p.t==="Q") addLog("up",p.c,`퀸 ${at} → 아마존 변신`,`-${u.cost}P · 남은 ${S.pts[p.c]}P`);
+  else addLog("up",p.c,`${NAME[p.t]} ${at} ${p.lv+1}강 강화${p.lv+1===UPG[p.t].length?" (최종)":""}`,`-${u.cost}P · 남은 ${S.pts[p.c]}P`);
+  if(p.t==="Q"){ p.t="A"; p.lv=1; toast([`퀸 → 아마존 변신!`]); }
+  else{
+    p.lv++;
+    if(p.t==="K"&&p.lv===3){ S.maxHp[p.c]=3; S.hp[p.c]=3; }
+    toast([`${NAME[p.t]} ${p.lv}강 완료!`]);
+  }
+}
+
+function sqName(i){ return "abcdefgh"[i&7]+(8-(i>>3)); }
+function describeMove(m,promoTo){
+  const B=S.board, p=B[m.from];
+  if(m.hit) return `${NAME[p.t]} ${sqName(m.from)} → ${sqName(m.to)} 킹 공격`;
+  let t = m.castle ? `캐슬링 (${m.castle==="K"?"킹사이드":"퀸사이드"})` : `${NAME[p.t]} ${sqName(m.from)} → ${sqName(m.to)}`;
+  const caps=m.captures.filter(x=>B[x]).map(x=>`${NAME[B[x].t]} ${sqName(x)}`);
+  if(caps.length) t+=` × ${caps.join(", ")}`;
+  if(m.ep) t+=" (앙파상)";
+  if(m.promo) t+=` = ${NAME[promoTo||"Q"]} 승격`;
+  return t;
+}
+function addLog(kind,side,text,ev=""){ gameLog.push({kind,side,text,ev,cyc:S.cycle+1}); }
+function endGame(over){
+  S.over=over; upMode=false; upSel=-1; sel=-1; selMoves=[];
+  addLog("end",null,over.winner?`${SIDE[over.winner]} 승리 — ${over.reason}`:`무승부 — ${over.reason}`);
+  render(); setTimeout(showOver,400);
+}
+function commit(m,promoTo){
+  if(S.over) return;
+  const mover=S.turn;
+  if(tc.b){ clk[mover]-=performance.now()-turnStart; clk[mover]+=tc.i*1000; }
+  turnStart=performance.now();
+  const text=describeMove(m,promoTo);
+  const prevCycle=S.cycle;
+  S=applyMove(S,m,promoTo);
+  const evs=S.events.filter(e=>!e.startsWith("사이클"));
+  gameLog.push({kind:"move",side:mover,text,ev:evs.join(" · "),cyc:prevCycle+1});
+  if(S.cycle!==prevCycle) addLog("sys",null,`사이클 ${S.cycle} 완료 · 양측 +1P`);
+  sel=-1; selMoves=[];
+  checkEnd(S);
+  if(!S.over && inCheck(S,S.turn)) gameLog[gameLog.length-(S.cycle!==prevCycle?2:1)].text += S.hp[S.turn]===1?" +체크":" +위협";
+  if(S.over){ const o=S.over; S.over=null; endGame(o); toast(S.events); return; }
+  render(); toast(S.events);
+}
+
+boardEl.addEventListener("click",e=>{
+  const el=e.target.closest(".sq"); if(!el||S.over) return;
+  const s=+el.dataset.s, p=S.board[s];
+  if(upMode){
+    if(p&&p.c===S.turn){ if(upSel===s) tryUpgrade(s); else upSel=s; }
+    else upSel=-1;
+    render(); return;
+  }
+  if(sel>=0){
+    const m=selMoves.find(m=>m.to===s);
+    if(m){
+      if(m.promo){ pendingMove=m; showPromo(S.board[m.from].c); return; }
+      commit(m); return;
+    }
+  }
+  if(p&&p.c===S.turn&&s!==sel){ sel=s; selMoves=legalMoves(S,s); }
+  else { sel=-1; selMoves=[]; }
+  render();
+});
+
+function showPromo(color){
+  const box=$("promoBox"); box.innerHTML="";
+  for(const t of ["Q","R","B","N"]){
+    const b=document.createElement("button");
+    b.innerHTML=`<span class="pc ${color}" style="font-size:44px">${GLYPH[t]+VS}</span>`;
+    b.onclick=()=>{ $("promoM").classList.remove("show"); const m=pendingMove; pendingMove=null; commit(m,t); };
+    box.appendChild(b);
+  }
+  $("promoM").classList.add("show");
+}
+function showOver(){
+  const o=S.over;
+  $("overT").textContent = o.winner ? `${SIDE[o.winner]} 승리!` : "무승부";
+  $("overD").textContent = `${o.reason} · 완료 사이클 ${S.cycle}`;
+  $("overM").classList.add("show");
+}
+$("overView").onclick=()=>$("overM").classList.remove("show");
+$("overNew").onclick=()=>{ $("overM").classList.remove("show"); openNew(); };
+$("overLog").onclick=()=>{ $("overM").classList.remove("show"); openLog(); };
+$("newBtn").onclick=openNew;
+let tcPick=tcIdx;
+function openNew(){
+  tcPick=tcIdx; drawTC();
+  $("confNote").style.display = S.over||!gameLog.length ? "none" : "block";
+  $("confM").classList.add("show");
+}
+function drawTC(){
+  $("tcBox").innerHTML=TCS.map((t,i)=>`<button class="${i===tcPick?"on":""}" data-i="${i}">${t.l}</button>`).join("");
+  $("tcBox").querySelectorAll("button").forEach(b=>b.onclick=()=>{ tcPick=+b.dataset.i; drawTC(); });
+}
+$("confNo").onclick=()=>$("confM").classList.remove("show");
+$("confYes").onclick=()=>{ $("confM").classList.remove("show"); reset(); };
+function reset(){
+  tcIdx=tcPick; tc=TCS[tcIdx]; try{ localStorage.setItem("aceTC",tcIdx); }catch(e){}
+  S=newState(); sel=-1; selMoves=[]; upMode=false; upSel=-1;
+  clk={w:tc.b*1000,b:tc.b*1000}; turnStart=performance.now();
+  gameLog=[]; addLog("sys",null,`게임 시작 · 시간 ${tc.l}`);
+  render();
+}
+
+/* ---- 시계 ---- */
+function remain(c){ return c===S.turn&&!S.over ? clk[c]-(performance.now()-turnStart) : clk[c]; }
+function fmt(ms){
+  ms=Math.max(0,ms); const s=Math.ceil(ms/1000);
+  if(ms<10000) return (ms/1000).toFixed(1);
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function drawClocks(){
+  if(!tc.b) return;
+  for(const c of ["w","b"]){
+    const el=$("clk-"+c); if(!el) continue;
+    const r=remain(c); el.textContent="⏱ "+fmt(r); el.classList.toggle("low", r<20000);
+  }
+}
+setInterval(()=>{
+  if(!tc.b||S.over) return;
+  drawClocks();
+  if(remain(S.turn)<=0){
+    clk[S.turn]=0;
+    if(pendingMove){ pendingMove=null; $("promoM").classList.remove("show"); }
+    endGame({winner:other(S.turn),reason:`${SIDE[S.turn]} 시간 초과`});
+  }
+},100);
+
+/* ---- 기록 ---- */
+function openLog(){
+  $("logList").innerHTML=gameLog.map(e=>{
+    if(e.kind==="sys"||e.kind==="end") return `<li class="${e.kind}">${e.text}</li>`;
+    return `<li class="${e.kind}"><span class="n">${e.cyc}</span><span class="sd ${e.side}">${SIDE[e.side]}</span>
+      <span class="tx">${e.text}${e.ev?`<span class="ev">${e.ev}</span>`:""}</span></li>`;
+  }).join("");
+  $("logM").classList.add("show");
+  const L=$("logList"); L.scrollTop=L.scrollHeight;
+}
+$("logBtn").onclick=openLog;
+$("logClose").onclick=()=>$("logM").classList.remove("show");
+$("logCopy").onclick=()=>{
+  const txt=gameLog.map(e=>e.side?`[${e.cyc}] ${SIDE[e.side]} ${e.text}${e.ev?" ("+e.ev+")":""}`:`— ${e.text} —`).join("\n");
+  const done=()=>toast(["기록을 복사했어요"]);
+  try{ navigator.clipboard.writeText(txt).then(done,()=>fallbackCopy(txt,done)); }catch(e){ fallbackCopy(txt,done); }
+};
+function fallbackCopy(t,done){
+  const a=document.createElement("textarea"); a.value=t; document.body.appendChild(a); a.select();
+  try{ document.execCommand("copy"); done(); }catch(e){} a.remove();
+}
+
+function buildHelp(){
+  const row=(t)=>UPG[t].map((u,i)=>`<tr><td>${t==="Q"?"변신":(i+1)+"강"} · ${u.cost}P</td><td>${u.desc}</td></tr>`).join("");
+  $("helpC").innerHTML=`<h2>에이스 체스 규칙</h2>
+  <ul>
+    <li>기본은 일반 체스 규칙(캐슬링, 앙파상, 승격, 체크메이트, 스테일메이트)을 따릅니다.</li>
+    <li>흑과 백이 모두 한 번씩 움직이면 <b>1사이클</b>. 사이클마다 양측 +1P.</li>
+    <li>적 기물을 잡으면 그 기물 점수만큼 획득 (폰1 · 나이트3 · 비숍3 · 룩5 · 퀸9 · 아마존12, 3강 비숍5).</li>
+    <li>자기 차례에 <b>강화</b> 버튼 → 기물 1번 탭: 설명 박스 표시 → 같은 기물 한 번 더 탭: 강화. 강화는 차례를 소모하지 않습니다.</li>
+    <li>박스 테두리: <span style="color:var(--green)">초록</span> 강화 가능 · <span style="color:var(--gold)">노랑</span> 최종 강화 가능 · <span style="color:var(--gray)">회색</span> 포인트 부족.</li>
+    <li>강화는 이전 단계에 중첩됩니다 (룩 3강만 예외로 이전 능력을 대체). 승격한 기물은 0강부터 시작.</li>
+  </ul>
+  <h3>폰</h3><table>${row("P")}</table>
+  <h3>비숍</h3><table>${row("B")}</table>
+  <h3>룩</h3><table>${row("R")}</table>
+  <h3>나이트</h3><table>${row("N")}</table>
+  <p style="font-size:12px;color:var(--sub)">나이트 진로 = 한 방향 2칸 → 옆으로 1칸. 진로상 적 기물 위 표시가 빨간 링이면 여러 기물을 함께 잡는 이동입니다.</p>
+  <h3>킹</h3><table>${row("K")}</table>
+  <p style="font-size:12px;color:var(--sub)">체력 2 이상일 때 킹은 체크 제한 없이 움직이며, 적이 킹 칸으로 이동하면(점선 표시) 그 기물은 제자리에 있고 킹 체력이 1 깎입니다. 체력이 1이 되면 일반 체크 규칙이 적용됩니다.</p>
+  <h3>퀸</h3><table>${row("Q")}</table>
+  <button class="close" id="helpClose">닫기</button>`;
+  $("helpClose").onclick=()=>$("helpM").classList.remove("show");
+}
+$("helpBtn").onclick=()=>{ buildHelp(); $("helpM").classList.add("show"); };
+
+$("resignBtn").onclick=()=>{
+  if(S.over) return;
+  $("resT").textContent=`${SIDE[S.turn]}이 기권할까요?`;
+  $("resM").classList.add("show");
+};
+$("resNo").onclick=()=>$("resM").classList.remove("show");
+$("resYes").onclick=()=>{
+  $("resM").classList.remove("show");
+  if(S.over) return;
+  endGame({winner:other(S.turn),reason:`${SIDE[S.turn]} 기권`});
+};
+$("flipBtn").onclick=()=>{
+  autoFlip=!autoFlip; try{ localStorage.setItem("aceFlip",autoFlip?"1":"0"); }catch(e){}
+  render();
+};
+window.addEventListener("resize",layout);
+addLog("sys",null,`게임 시작 · 시간 ${tc.l}`);
+layout(); render();
+</script>
+</body>
+</html>
