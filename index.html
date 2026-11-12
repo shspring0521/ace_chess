@@ -140,7 +140,7 @@ body.flipping:not(.flip) .pcw, body.flipping:not(.flip) .coord, body.flipping:no
 <div class="modal" id="logM"><div class="card rot"><h2>게임 기록</h2><ul id="logList"></ul>
   <div class="over-btns"><button class="close" id="logCopy" style="background:#444">텍스트 복사</button><button class="close" id="logClose">닫기</button></div></div></div>
 <div class="modal" id="helpM"><div class="card rot" id="helpC"></div></div>
-<div class="modal" id="confM"><div class="card rot" style="text-align:center"><h2>새 게임</h2><p style="margin:0">시간 제한 (각자 보유 시간 + 수당 추가 시간)</p><div class="tcs" id="tcBox"></div><p id="confNote" style="font-size:12px;color:var(--sub)">현재 게임은 사라집니다.</p>
+<div class="modal" id="confM"><div class="card rot" style="text-align:center"><h2>새 게임</h2><p style="margin:0">시간 제한 (각자 보유 시간)</p><div class="tcs" id="tcBox"></div><p id="confNote" style="font-size:12px;color:var(--sub)">현재 게임은 사라집니다.</p>
   <div class="over-btns"><button class="close" id="confNo" style="background:#444">취소</button><button class="close" id="confYes">시작</button></div></div></div>
 
 <script>
@@ -160,7 +160,7 @@ const UPG = {
   R:[{cost:4,desc:"아군 기물 1개를 뛰어넘어 이동 가능 (넘은 뒤 잡기 가능)"},
      {cost:5,desc:"적 기물 1개를 뛰어넘어 이동 가능 (넘은 뒤 잡기 가능)"},
      {cost:7,desc:"이전 능력 삭제 → 아무 기물이나 2개 뛰어넘기 가능 (잡기 가능)"}],
-  N:[{cost:4,desc:"뛰어넘은 적 기물을 잡음 (가장 먼저 넘은 1개)"},
+  N:[{cost:4,desc:"뛰어넘을 때 현재 위치에 인접한 진로 첫 칸의 적 기물을 잡음 (도착 칸 포함 최대 2개)"},
      {cost:6,desc:"L자 진로(앞 2칸 + 옆 1칸) 위의 어느 칸이든 멈출 수 있음"},
      {cost:9,desc:"진로 끝까지 이동하면 진로상의 모든 적 기물을 잡음"}],
   K:[{cost:5,desc:"아군 기물이 잡히면 폰 1 · 마이너 3 · 메이저 4 포인트 획득"},
@@ -237,8 +237,8 @@ function pseudo(S, from){
           if(!m.hit && lv>=1){
             const jumped=path.slice(0,i).map(([a,b])=>SQ(a,b));
             const foes=jumped.filter(s=>B[s]&&B[s].c!==p.c&&B[s].t!=="K");
-            if(lv>=3 && i===2) m.captures.push(...foes);
-            else if(foes.length) m.captures.push(foes[0]);
+            if(lv>=3 && i===2) m.captures.push(...foes);          // 3강 최대 진로: 진로상 모든 적 (최대 3)
+            else if(foes.includes(SQ(path[0][0],path[0][1]))) m.captures.push(SQ(path[0][0],path[0][1])); // 1·2강: 인접 칸만 (최대 2)
             if(m.captures.length>(q&&!m.hit?1:0)) m.multi=true;
           }
           out.push(m);
@@ -381,7 +381,7 @@ function checkEnd(S){
 /* ===================== UI ===================== */
 let autoFlip=true;
 try{ autoFlip = localStorage.getItem("aceFlip")!=="0"; }catch(e){}
-const TCS=[{l:"무제한",b:0,i:0},{l:"1분",b:60,i:0},{l:"3분 +2초",b:180,i:2},{l:"5분",b:300,i:0},{l:"10분",b:600,i:0},{l:"15분 +10초",b:900,i:10}];
+const TCS=[{l:"무제한",b:0},{l:"1분",b:60},{l:"3분",b:180},{l:"5분",b:300},{l:"10분",b:600},{l:"15분",b:900}];
 let tcIdx=0; try{ const v=+localStorage.getItem("aceTC"); if(v>=0&&v<TCS.length) tcIdx=v; }catch(e){}
 let tc=TCS[tcIdx], clk={w:tc.b*1000,b:tc.b*1000}, turnStart=performance.now();
 let gameLog=[], prevFlip=false, flipT=0;
@@ -534,7 +534,7 @@ function endGame(over){
 function commit(m,promoTo){
   if(S.over) return;
   const mover=S.turn;
-  if(tc.b){ clk[mover]-=performance.now()-turnStart; clk[mover]+=tc.i*1000; }
+  if(tc.b) clk[mover]-=performance.now()-turnStart;
   turnStart=performance.now();
   const text=describeMove(m,promoTo);
   const prevCycle=S.cycle;
@@ -670,7 +670,7 @@ function buildHelp(){
   <h3>비숍</h3><table>${row("B")}</table>
   <h3>룩</h3><table>${row("R")}</table>
   <h3>나이트</h3><table>${row("N")}</table>
-  <p style="font-size:12px;color:var(--sub)">나이트 진로 = 한 방향 2칸 → 옆으로 1칸. 진로상 적 기물 위 표시가 빨간 링이면 여러 기물을 함께 잡는 이동입니다.</p>
+  <p style="font-size:12px;color:var(--sub)">나이트 진로 = 한 방향 2칸 → 옆으로 1칸. 1·2강은 현재 위치 바로 옆(진로 첫 칸)의 적만, 3강은 진로 끝까지 갔을 때 진로상 모든 적을 잡습니다. 진로상 적 기물 위 표시가 빨간 링이면 여러 기물을 함께 잡는 이동입니다.</p>
   <h3>킹</h3><table>${row("K")}</table>
   <p style="font-size:12px;color:var(--sub)">체력 2 이상일 때 킹은 체크 제한 없이 움직이며, 적이 킹 칸으로 이동하면(점선 표시) 그 기물은 제자리에 있고 킹 체력이 1 깎입니다. 체력이 1이 되면 일반 체크 규칙이 적용됩니다.</p>
   <h3>퀸</h3><table>${row("Q")}</table>
